@@ -132,12 +132,16 @@ run_timer() {
   local seconds=$1
   local label="$2"
   local color="$3"
+  local countdown_words=(cinco cuatro tres dos uno)
 
   hide_cursor
   while (( seconds > 0 )); do
     local m=$((seconds / 60))
     local s=$((seconds % 60))
     printf "\r\033[K${color}[%s]${color_reset} Tiempo restante: ${color_white}%02d:%02d${color_reset}" "$label" "$m" "$s"
+    if [[ "$USE_VOICE" -eq 1 ]] && (( seconds <= 5 && seconds >= 1 )); then
+      say -v "$VOICE_NAME" "${countdown_words[$((6 - seconds))]}" >/dev/null 2>&1 &
+    fi
     sleep 1
     ((seconds--))
   done
