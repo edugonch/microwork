@@ -641,9 +641,9 @@ parse_args() {
 # 8b) INTEGRACIÓN IA
 # ------------------------------------------------------------------------------
 load_ai_recommendations() {
-  [[ "$USE_AI" -eq 0 ]] && return
-  command -v python3 >/dev/null 2>&1 || return
-  [[ -f "$AI_PYTHON_SCRIPT" ]] || return
+  [[ "$USE_AI" -eq 0 ]] && return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  [[ -f "$AI_PYTHON_SCRIPT" ]] || return 0
 
   local args=("start" "--mode" "$MODE")
   [[ "$AI_FORCE_REFRESH" -eq 1 ]] && args+=("--refresh-ai")
@@ -663,9 +663,9 @@ load_ai_recommendations() {
 
 log_cycle_to_session() {
   local routine_id="$1" category="$2" intensity="$3" routine_name="$4"
-  [[ "$USE_AI" -eq 0 ]] && return
-  command -v python3 >/dev/null 2>&1 || return
-  [[ -f "$AI_PYTHON_SCRIPT" ]] || return
+  [[ "$USE_AI" -eq 0 ]] && return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  [[ -f "$AI_PYTHON_SCRIPT" ]] || return 0
   python3 "$AI_PYTHON_SCRIPT" log "$routine_id" "$category" "$intensity" "$routine_name" >/dev/null 2>&1
 }
 
@@ -751,4 +751,5 @@ main() {
   done
 }
 
-main "$@"
+# Guard: allows sourcing the script in tests without executing main
+[[ "${MICROBREAK_SOURCED:-0}" -eq 1 ]] || main "$@"
