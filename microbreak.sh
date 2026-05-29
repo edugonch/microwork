@@ -38,6 +38,21 @@ POST_MEAL_BIAS_CYCLES=(2 4 6)
 MAX_EQUIPMENT_UPPER_PER_DAY=2
 MAX_EQUIPMENT_CORE_PER_DAY=1
 
+# Integración IA (opcional — degradación graceful si Python/API no disponible)
+USE_AI=1
+AI_PYTHON_SCRIPT="$(dirname "$0")/workout_ai.py"
+USER_SET_MODE=0
+AI_FORCE_REFRESH=0
+AI_PROVIDER_OVERRIDE=""
+
+# Variables que llena load_ai_recommendations()
+AI_ENABLED=0
+AI_PRIORITY_ORDER=""
+AI_SOFT_AVOID=""
+AI_RECOMMENDED_MODE=""
+AI_GAP_ANALYSIS=""
+AI_MESSAGE=""
+
 # ------------------------------------------------------------------------------
 # 2) VARIABLES INTERNAS
 # ------------------------------------------------------------------------------
@@ -115,6 +130,9 @@ cleanup() {
   printf "  - equipo superior:  %d\n" "${CATEGORY_COUNTS[equipment_upper]}"
   printf "  - ab wheel/core:    %d\n" "${CATEGORY_COUNTS[equipment_core]}"
   printf "\nBuen trabajo. Esto sí suma para glucosa, postura, fuerza y energía.\n\n"
+  if [[ "$USE_AI" -eq 1 ]] && command -v python3 >/dev/null 2>&1; then
+    python3 "$AI_PYTHON_SCRIPT" end >/dev/null 2>&1
+  fi
   exit 0
 }
 trap cleanup SIGINT TERM
@@ -506,16 +524,35 @@ pick_routine() {
     preferred_category="equipment_core"
   fi
 
-  for id in "${ROUTINES[@]}"; do
-    routine_matches_mode "$id" || continue
-    routine_allowed_by_equipment_limits "$id" || continue
-    load_routine "$id" || continue
+  # --- Tier 0: AI priority order (suave — respeta reglas duras existentes) ---
+  if [[ "$AI_ENABLED" -eq 1 && -n "$AI_PRIORITY_ORDER" ]]; then
+    local ai_cat
+    for ai_cat in ${(z)"$AI_PRIORITY_ORDER"}; do
+      for id in "${ROUTINES[@]}"; do
+        routine_matches_mode "$id" || continue
+        routine_allowed_by_equipment_limits "$id" || continue
+        load_routine "$id" || continue
+        [[ "$ROUTINE_CATEGORY" == "$ai_cat" && "$ROUTINE_CATEGORY" != "$LAST_CATEGORY" ]] || continue
+        candidate_ids+=("$id")
+      done
+      (( ${#candidate_ids[@]} > 0 )) && break
+    done
+  fi
 
-    if [[ "$ROUTINE_CATEGORY" == "$preferred_category" && "$ROUTINE_CATEGORY" != "$LAST_CATEGORY" ]]; then
-      candidate_ids+=("$id")
-    fi
-  done
+  # --- Tier 1: preferred category (lógica original) ---
+  if (( ${#candidate_ids[@]} == 0 )); then
+    for id in "${ROUTINES[@]}"; do
+      routine_matches_mode "$id" || continue
+      routine_allowed_by_equipment_limits "$id" || continue
+      load_routine "$id" || continue
 
+      if [[ "$ROUTINE_CATEGORY" == "$preferred_category" && "$ROUTINE_CATEGORY" != "$LAST_CATEGORY" ]]; then
+        candidate_ids+=("$id")
+      fi
+    done
+  fi
+
+  # --- Tier 2: cualquier categoría distinta a la última ---
   if (( ${#candidate_ids[@]} == 0 )); then
     for id in "${ROUTINES[@]}"; do
       routine_matches_mode "$id" || continue
@@ -528,6 +565,7 @@ pick_routine() {
     done
   fi
 
+  # --- Tier 3: cualquier rutina válida ---
   if (( ${#candidate_ids[@]} == 0 )); then
     for id in "${ROUTINES[@]}"; do
       routine_matches_mode "$id" || continue
@@ -560,9 +598,11 @@ parse_args() {
         ;;
       --minimal)
         MODE="minimal"
+        USER_SET_MODE=1
         ;;
       --intense)
         MODE="intense"
+        USER_SET_MODE=1
         ;;
       --silent)
         USE_VOICE=0
@@ -580,11 +620,53 @@ parse_args() {
         shift
         [[ -n "$1" ]] && VOICE_NAME="$1"
         ;;
+      --no-ai)
+        USE_AI=0
+        ;;
+      --refresh-ai)
+        AI_FORCE_REFRESH=1
+        ;;
+      --ai-provider)
+        shift
+        [[ -n "$1" ]] && AI_PROVIDER_OVERRIDE="$1"
+        ;;
       *)
         ;;
     esac
     shift
   done
+}
+
+# ------------------------------------------------------------------------------
+# 8b) INTEGRACIÓN IA
+# ------------------------------------------------------------------------------
+load_ai_recommendations() {
+  [[ "$USE_AI" -eq 0 ]] && return
+  command -v python3 >/dev/null 2>&1 || return
+  [[ -f "$AI_PYTHON_SCRIPT" ]] || return
+
+  local args=("start" "--mode" "$MODE")
+  [[ "$AI_FORCE_REFRESH" -eq 1 ]] && args+=("--refresh-ai")
+  [[ -n "$AI_PROVIDER_OVERRIDE" ]] && args+=("--ai-provider" "$AI_PROVIDER_OVERRIDE")
+
+  local ai_out
+  ai_out="$(python3 "$AI_PYTHON_SCRIPT" "${args[@]}" 2>/dev/null)" || return
+
+  [[ -z "$ai_out" ]] && return
+  eval "$ai_out" 2>/dev/null || return
+
+  # Solo cambiar MODE si el usuario no lo fijó explícitamente
+  if [[ -n "$AI_RECOMMENDED_MODE" && "$USER_SET_MODE" -eq 0 ]]; then
+    MODE="$AI_RECOMMENDED_MODE"
+  fi
+}
+
+log_cycle_to_session() {
+  local routine_id="$1" category="$2" intensity="$3" routine_name="$4"
+  [[ "$USE_AI" -eq 0 ]] && return
+  command -v python3 >/dev/null 2>&1 || return
+  [[ -f "$AI_PYTHON_SCRIPT" ]] || return
+  python3 "$AI_PYTHON_SCRIPT" log "$routine_id" "$category" "$intensity" "$routine_name" >/dev/null 2>&1
 }
 
 # ------------------------------------------------------------------------------
@@ -612,6 +694,12 @@ show_banner() {
   printf "Presiona ${color_red}Ctrl+C${color_reset} para salir.\n\n"
   printf "Sugerencia T2D: si acabas de comer, no saltes la pausa. Prioriza bloques metabólicos/cardio.\n"
   printf "Equipo: push-up board máximo %d veces/día; ab wheel máximo %d vez/día.\n\n" "$MAX_EQUIPMENT_UPPER_PER_DAY" "$MAX_EQUIPMENT_CORE_PER_DAY"
+  if [[ -n "$AI_GAP_ANALYSIS" ]]; then
+    printf "${color_yellow}[IA] %s${color_reset}\n" "$AI_GAP_ANALYSIS"
+  fi
+  if [[ -n "$AI_MESSAGE" ]]; then
+    printf "${color_green}[IA] %s${color_reset}\n\n" "$AI_MESSAGE"
+  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -619,6 +707,7 @@ show_banner() {
 # ------------------------------------------------------------------------------
 main() {
   parse_args "$@"
+  load_ai_recommendations
   show_banner
 
   while true; do
@@ -646,6 +735,8 @@ main() {
 
     (( CYCLES_COMPLETED++ ))
     (( CATEGORY_COUNTS[$ROUTINE_CATEGORY]++ ))
+
+    log_cycle_to_session "$routine_id" "$ROUTINE_CATEGORY" "$ROUTINE_INTENSITY" "$ROUTINE_NAME"
 
     if [[ "$ANNOUNCE_NEXT_WORK" -eq 1 ]]; then
       send_alert \

@@ -1,0 +1,6 @@
+# Config local con API keys — nunca commitear
+config.json
+
+# Cache y sesiones de ejercicio (datos personales, viven en ~/.workout/)
+__pycache__/
+*.pyc
