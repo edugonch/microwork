@@ -527,7 +527,7 @@ pick_routine() {
   # --- Tier 0: AI priority order (suave — respeta reglas duras existentes) ---
   if [[ "$AI_ENABLED" -eq 1 && -n "$AI_PRIORITY_ORDER" ]]; then
     local ai_cat
-    for ai_cat in ${(z)"$AI_PRIORITY_ORDER"}; do
+    for ai_cat in ${=AI_PRIORITY_ORDER}; do
       for id in "${ROUTINES[@]}"; do
         routine_matches_mode "$id" || continue
         routine_allowed_by_equipment_limits "$id" || continue
