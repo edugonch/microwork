@@ -1,170 +1,199 @@
-# 🧠 MicroBreak T2D — Terminal Micro-Workout System
+# MicroBreak T2D — Terminal Micro-Workout System
 
-**A terminal-based micro-workout system for macOS (Zsh) that integrates guided 5-minute exercise sessions into 60-minute work cycles, optimizing metabolic health, posture, and productivity without breaking focus.**
+**A terminal-based micro-workout system for macOS (Zsh) that integrates guided 5-minute exercise sessions into 60-minute work cycles — now with an AI coach that learns from your history.**
 
 ---
 
-## 🚀 Overview
+## Overview
 
-MicroBreak T2D is a **lightweight, terminal-first automation tool** designed for people who spend long hours in front of a computer.
-
-It implements a simple but powerful loop:
+MicroBreak T2D implements a simple but powerful loop:
 
 > **60 minutes of focused work → 5 minutes of guided movement**
 
 Unlike basic timers, this system:
 
-* guides you through **structured micro-workouts**
-* intelligently rotates exercise types
-* minimizes cognitive interruption
-* requires **no gym, no setup, no friction**
+- guides you through **structured micro-workouts**
+- intelligently rotates exercise types to avoid repetition
+- **remembers your session history** and detects gaps in your routine
+- connects to an **AI coach** (Claude, GPT, Llama, or local Ollama) that adapts today's priorities based on what you've done and how long you've rested
+- requires **no gym, no setup, no friction**
 
 ---
 
-## 🎯 Why this exists
+## Why this exists
 
-Long periods of sitting are strongly linked to:
+Long periods of sitting are strongly linked to poor glucose regulation, reduced insulin sensitivity, mental fatigue, and musculoskeletal issues.
 
-* poor glucose regulation
-* reduced insulin sensitivity
-* mental fatigue
-* musculoskeletal issues
-
-MicroBreak T2D applies the concept of **“exercise snacking”**:
+MicroBreak T2D applies the concept of **"exercise snacking"**:
 
 > small, frequent bouts of movement → real metabolic impact
 
-Designed especially for:
-
-* developers 👨‍💻
-* remote workers 🏠
-* knowledge workers 🧠
-* people managing **Type 2 Diabetes**
+Designed especially for developers, remote workers, and people managing **Type 2 Diabetes**.
 
 ---
 
-## ⚙️ Features
+## Features
 
-* ⏱ **60/5 work-rest cycle**
-* 🧭 **Intelligent routine rotation**
-
-  * mobility
-  * metabolic (legs-focused)
-  * upper body
-  * cardio
-  * core
-  * full body
-* 🗣 **Voice guidance (macOS `say`)**
-* 🔔 **Native macOS notifications**
-* 🖥 **Terminal-first UX (no GUI required)**
-* 🎯 **Guided exercise execution (step-by-step)**
-* 🔁 Infinite loop until stopped
-* 🧪 **Test mode for quick validation**
-* 🔧 **Minimal / Intense modes**
+- **60/5 work-rest cycle** (configurable)
+- **12 pre-built routines**: mobility, metabolic, upper body, cardio, core, full body, push-up board, ab wheel
+- **AI coach** with session memory — adapts daily priorities based on history and gaps
+- **Session persistence** — every cycle is saved to `~/.workout/sessions/YYYY-MM-DD.json`
+- **Gap detection** — if you missed 2+ days, the AI suggests a gentler restart
+- **4 LLM providers**: Anthropic (Claude), OpenAI, Together AI (open-source models), Ollama (local, free)
+- **Graceful degradation** — runs exactly like before if Python or API key is unavailable
+- **Voice guidance** (macOS `say`)
+- **Native macOS notifications**
+- **Minimal / Intense / Normal modes**
+- **Test mode** for quick validation
 
 ---
 
-## 🧠 How it works
-
-Each cycle:
-
-1. 🧑‍💻 Work deeply for 60 minutes
-2. 🔔 Get notified
-3. 🏃 Perform a **guided 5-minute routine**
-4. 🔁 Repeat
-
-The system:
-
-* avoids repeating the same category consecutively
-* biases toward **metabolic/cardio blocks after meals**
-* balances load across the day
-* keeps sessions **short, effective, and realistic**
-
----
-
-## 📦 Installation
-
-Clone the repository:
+## Installation (macOS)
 
 ```bash
 git clone https://github.com/your-username/microbreak-t2d.git
 cd microbreak-t2d
+./install.sh
 ```
 
-Make the script executable:
+The installer:
+
+1. Copies `microbreak` and `workout_ai.py` to `~/.local/bin/`
+2. Adds `~/.local/bin` to your PATH if needed (edits `~/.zshrc`)
+3. Preserves any existing aliases (e.g. `microb`)
+4. Asks which AI provider you want to use
+5. Prompts for your API key and saves it to `config.json` (gitignored)
+
+After installation:
 
 ```bash
-chmod +x microbreak.sh
+microbreak
 ```
 
-Run it:
+To update after pulling new changes:
 
 ```bash
-./microbreak.sh
+cd microbreak-t2d
+./install.sh
 ```
 
 ---
 
-## 🧪 Test Mode
+## AI Coach
 
-Run with short timers:
+On each session start, the AI analyzes your last 14 days and recommends which exercise categories to prioritize today.
+
+**What it considers:**
+
+- Days without sessions (gaps)
+- Category distribution (e.g. you haven't done core in a week)
+- Today's day of the week and mode
+
+**What it outputs:**
+
+- A priority order for today's exercise categories
+- A motivational message shown in the banner
+- A gap analysis if you've been away
+
+The AI **suggests priorities** — the script's existing rules (equipment limits, mode, anti-repetition, post-meal bias) still apply on top.
+
+### Supported providers
+
+| Provider    | Models                    | Requires               |
+| ----------- | ------------------------- | ---------------------- |
+| `anthropic` | Claude Sonnet             | `ANTHROPIC_API_KEY`    |
+| `openai`    | GPT-4o mini               | `OPENAI_API_KEY`       |
+| `together`  | Llama 3.3, Mixtral, Qwen  | `TOGETHER_API_KEY`     |
+| `ollama`    | Any local model           | Ollama running locally |
+
+Switch provider at any time:
 
 ```bash
-./microbreak.sh --test
+microbreak --ai-provider together
+```
+
+### API key setup
+
+The installer handles this interactively. If you skipped it, run `install.sh` again or edit `config.json` directly:
+
+```bash
+# config.json lives next to the installed script:
+~/.local/bin/config.json
+```
+
+```json
+{
+  "llm_provider": "anthropic",
+  "api_keys": {
+    "anthropic": "sk-ant-..."
+  }
+}
+```
+
+`config.json` is gitignored — your keys never leave your machine.
+
+### AI flags
+
+```bash
+microbreak --no-ai          # Disable AI entirely (no Python call)
+microbreak --refresh-ai     # Force new LLM call, ignore daily cache
+microbreak --ai-provider ollama
 ```
 
 ---
 
-## 🎮 Usage Options
-
-### Minimal mode (low energy days)
+## Usage
 
 ```bash
-./microbreak.sh --minimal
-```
-
-* ultra simple routines
-* low intensity
-* minimal friction
-
----
-
-### Intense mode (high energy days)
-
-```bash
-./microbreak.sh --intense
-```
-
-* higher intensity
-* more cardiovascular demand
-
----
-
-### Disable voice
-
-```bash
-./microbreak.sh --silent
+microbreak                  # Normal mode
+microbreak --minimal        # Low-intensity (bad energy days)
+microbreak --intense        # High-intensity (good energy days)
+microbreak --test           # Short timers for quick testing
+microbreak --silent         # No voice
+microbreak --no-notify      # No macOS notifications
+microbreak --voice Paulina  # Change TTS voice
+microbreak --no-equipment   # Skip push-up board / ab wheel
 ```
 
 ---
 
-### Disable notifications
+## Session data
 
-```bash
-./microbreak.sh --no-notify
+Each session is saved to:
+
+```text
+~/.workout/sessions/YYYY-MM-DD.json
+```
+
+Multiple runs per day are stored as separate entries within the same file:
+
+```json
+{
+  "date": "2026-05-29",
+  "runs": [
+    {
+      "run_id": "20260529T090000",
+      "start_time": "09:00:00",
+      "end_time": "11:05:00",
+      "mode": "normal",
+      "cycles": [
+        {
+          "cycle": 1,
+          "routine_id": "movilidad_1",
+          "routine_name": "Reset Postural de Escritorio",
+          "category": "movilidad",
+          "intensity": "baja",
+          "completed_at": "10:05:32"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ---
 
-### Change voice
-
-```bash
-./microbreak.sh --voice Paulina
-```
-
----
-
-## 🗣 Voice Setup (macOS)
+## Voice setup (macOS)
 
 List available voices:
 
@@ -172,120 +201,72 @@ List available voices:
 say -v "?"
 ```
 
-Recommended Spanish voices:
+Recommended Spanish voices: `Monica`, `Paulina`
 
-* `Monica`
-* `Paulina`
-
-If voice sounds wrong:
-
-1. Go to:
-
-   * **System Settings → Accessibility → Spoken Content**
-2. Click:
-
-   * **Manage Voices**
-3. Download full Spanish voices
+To download full quality voices: **System Settings → Accessibility → Spoken Content → Manage Voices**
 
 ---
 
-## 🧩 Customization
+## Customization
 
-Edit the script:
+Edit `microbreak.sh` directly:
+
+```zsh
+WORK_MINUTES=60       # Work block duration
+BREAK_MINUTES=5       # Break duration
+VOICE_NAME="Mónica"   # TTS voice
+USE_EQUIPMENT=1       # Include push-up board / ab wheel
+```
+
+All routines are defined in `load_routine()` — add new ones by following the same pattern.
+
+---
+
+## Running tests
 
 ```bash
+python3 -m unittest test_workout_ai -v
+```
+
+44 tests covering session storage, gap detection, AI response validation, LLM providers, cache handling, and shell output formatting.
+
+---
+
+## How the AI works (technical)
+
+```text
 microbreak.sh
+  └── calls workout_ai.py start
+        ├── logs new run to ~/.workout/sessions/YYYY-MM-DD.json
+        ├── checks ~/.workout/cache/rec-YYYY-MM-DD.env (8h cache)
+        ├── summarizes last 14 days of history
+        ├── applies local heuristics (gap detection, category balance)
+        ├── optionally calls LLM with the summary
+        ├── validates LLM response (8 known categories, schema version)
+        └── outputs shell-safe KEY=VALUE lines → eval'd by microbreak.sh
 ```
 
-You can easily modify:
-
-### Work / Break duration
-
-```zsh
-WORK_MINUTES=60
-BREAK_MINUTES=5
-```
+If the LLM call fails or times out (>8s), the local heuristic is used instead. If Python is unavailable, the script runs exactly as before.
 
 ---
 
-### Voice
+## Design principles
 
-```zsh
-VOICE_NAME="Monica"
-```
-
----
-
-### Routine system
-
-All routines are defined inside:
-
-```zsh
-load_routine()
-```
-
-You can:
-
-* add new routines
-* change exercises
-* adjust durations
-* modify intensity
+- **Zero friction** — no setup, no equipment required
+- **Terminal-first** — always available, no GUI
+- **Cognitive respect** — minimal disruption to deep work
+- **Physiology-driven** — not random exercises
+- **AI as coach, not authority** — rules stay in code, AI suggests priorities
+- **Consistency > intensity**
 
 ---
 
-## 🧠 Design Principles
+## Disclaimer
 
-* **Zero friction** → no setup, no equipment
-* **Terminal-first** → always available
-* **Cognitive respect** → minimal disruption
-* **Physiology-driven** → not random exercises
-* **Consistency > intensity**
+This tool is not medical advice. If you have injuries, chronic conditions, or severe metabolic disorders, consult a professional before use.
 
 ---
 
-## ⚠️ Disclaimer
+## Author
 
-This tool is not medical advice.
-
-If you have:
-
-* injuries
-* chronic conditions
-* severe metabolic disorders
-
-Consult a professional before use.
-
----
-
-## 💡 Roadmap (ideas)
-
-* [ ] Adaptive routines based on time of day
-* [ ] User state input (tired / energized / post-meal)
-* [ ] Smart progression system
-* [ ] Logging & analytics
-* [ ] Integration with wearable data
-
----
-
-## ❤️ Philosophy
-
-> You don’t need a gym.
-> You need consistency.
-
----
-
-## 👤 Author
-
-Built for real-world use by someone who:
-
-* works long hours
-* values health
-* refuses unnecessary complexity
-
----
-
-## ⭐ If you find this useful
-
-Give it a star ⭐
-Or fork it and improve it 🚀
-
+Built for real-world use by someone who works long hours, values health, and refuses unnecessary complexity.
